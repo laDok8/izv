@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import gzip
 import io
-import os.path
+import os
 import csv
 import pickle
 
@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 
 class DataDownloader:
     """
-    downloader/parser for zip files on accidents.csv files with predetermined structure
+    downloader/parser for zip files with accidents.csv files with predetermined structure
 
     Attributes:
         headers    Nazvy hlavicek jednotlivych CSV souboru, tyto nazvy nemente!  
@@ -34,7 +34,8 @@ class DataDownloader:
                "p34", "p35", "p39", "p44", "p45a", "p47", "p48a", "p49", "p50a", "p50b", "p51", "p52", "p53", "p55a",
                "p57", "p58", "a", "b", "d", "e", "f", "g", "h", "i", "j", "k", "l", "n", "o", "p", "q", "r", "s", "t",
                "p5a"]
-    dataType = [int, int, str, str, int, int, int, int, int, int, int, int, int, int,
+
+    dataTypes = [str, int, str, str, int, int, int, int, int, int, int, int, int, int,
                 int, int, int, int, int, int, int, int, int, int, int, int, int, int,
                 int,
                 int, int, int, int, int, str, int, int, int, int, int, int, int, int,
@@ -71,6 +72,8 @@ class DataDownloader:
         function assumes **url** contains table that has buttons sorted chronologically from left to right
         """
         rawHtml = r.get(self.url)
+        rawHtml.raise_for_status()
+
         soup = BeautifulSoup(rawHtml.text, 'html.parser')
         htmlTable = soup.find("table")
         # check all rows in table for last existing button
@@ -105,14 +108,18 @@ class DataDownloader:
                     reader = csv.reader(io.TextIOWrapper(f, 'cp1250'), delimiter=';', quotechar='"')
                     for row in reader:
                         for (i, hdr) in enumerate(self.headers):
-                            # conversion
-                            if self.dataType[i] == int:
-                                _data = int(row[i]) if row[i] else 0
-                            elif self.dataType[i] == float:
-                                tmp = str.replace(row[i], ',', '.')
-                                _data = float(tmp) if tmp else 0.
-                            else:
+                            # type conversion
+                            try:
+                                if self.dataTypes[i] == int:
+                                    _data = int(row[i]) if row[i] else 0
+                                elif self.dataTypes[i] == float:
+                                    tmp = str.replace(row[i], ',', '.')
+                                    _data = float(tmp) if tmp else 0.
+                                else:
+                                    _data = row[i]
+                            except (Exception,):
                                 _data = row[i]
+
                             _dict[hdr] += [_data]
 
         # convert to np array
@@ -149,7 +156,7 @@ class DataDownloader:
                 fName += reg
 
             # is cached?
-            if self.cache.get(fName) is not None:
+            if reg in self.cache.keys():
                 _data = self.cache[reg]
             elif os.path.isfile(fName):
                 with gzip.open(fName, "rb") as f:
@@ -162,7 +169,7 @@ class DataDownloader:
                 acc[k] = np.append(acc[k], v)
 
             # cache
-            if self.cache.get(fName) is None:
+            if reg not in self.cache.keys():
                 self.cache[reg] = _data
             if not os.path.isfile(fName):
                 with gzip.open(fName, "wb", compresslevel=4) as f:
