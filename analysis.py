@@ -52,17 +52,17 @@ def plot_roadtype(df: pd.DataFrame, fig_location: str = None,
     }
     df['hodnota'] = 1
     # make hard copy because of changing labels
-    road_df = df.loc[:,['region', 'p21', 'hodnota']]
+    road_df = df.loc[:, ['region', 'p21', 'hodnota']]
     road_df['p21'].replace(_rename, inplace=True)
     road_df = pd.pivot_table(road_df, columns="region", index='p21', values='hodnota', aggfunc='sum')
     road_df = road_df[['HKK', 'JHC', 'JHM', 'KVK']]
-    road_df = road_df.stack().reset_index(name='počet nehod')
+    road_df = road_df.stack().reset_index(name='Počet nehod')
 
     # graphing
     sns.set_theme()
     sns.set_context("paper")
-    fig = sns.FacetGrid(road_df, col='p21',sharex=False, sharey=True, col_wrap=3)
-    fig.map(sns.barplot, 'region', 'počet nehod', palette="deep", order=None).set(yscale='log', ylim=(10, None))
+    fig = sns.FacetGrid(road_df, col='p21', sharex=False, sharey=True, col_wrap=3)
+    fig.map(sns.barplot, 'region', 'Počet nehod', palette="deep", order=None).set(yscale='log', ylim=(10, None))
     fig.set_titles('{col_name}')
     fig.tight_layout()
 
@@ -77,22 +77,82 @@ def plot_roadtype(df: pd.DataFrame, fig_location: str = None,
 # Ukol3: zavinění zvěří
 def plot_animals(df: pd.DataFrame, fig_location: str = None,
                  show_figure: bool = False):
-    pass
+    df['hodnota'] = 1
+    _rename = {
+        1: 'Řidičem',
+        2: 'Řidičem',
+        4: 'Zvěří',
+        0: 'Jiné', 3: 'Jiné', 5: 'Jiné', 6: 'Jiné', 7: 'Jiné',
+    }
+
+    animals_df = df[df['region'].isin(['HKK', 'JHC', 'JHM', 'KVK']) & (df['p58'] == 5)]
+    animals_df = animals_df.loc[:, ['date', 'p10', 'hodnota', 'region']]
+    animals_df['p10'].replace(_rename, inplace=True)
+    # remove 2021
+    animals_df = animals_df[animals_df['date'].dt.year != 2021]
+    animals_df['month'] = animals_df['date'].dt.month
+    # agregate month&region&cause
+    animals_df = animals_df.groupby(['region', 'month', 'p10']).agg('sum').reset_index()
+    animals_df.rename(columns={'hodnota': 'Počet nehod', 'month': 'Měsíc'}, inplace=True)
+
+    # graphing
+    sns.set_theme()
+    sns.set_context("paper")
+    fig = sns.FacetGrid(animals_df, col='region', sharex=False, sharey=True, col_wrap=2, height=4, aspect=1.5)
+    fig.map_dataframe(sns.barplot, x='Měsíc', y='Počet nehod', hue='p10', palette="deep", order=None)
+    fig.set_titles('Kraj: {col_name}')
+    fig.add_legend()
+    fig.tight_layout()
+
+    if fig_location:
+        plt.savefig(fig_location)
+
+    if show_figure:
+        plt.show()
+        plt.close()
 
 
 # Ukol 4: Povětrnostní podmínky
 def plot_conditions(df: pd.DataFrame, fig_location: str = None,
                     show_figure: bool = False):
-    pass
+    df['hodnota'] = 1
+    _rename = {
+        1: 'neztížené',
+        2: 'mlha',
+        3: 'na počátku deště',
+        4: 'déšť',
+        5: 'sněžení',
+        6: 'náledí',
+        7: 'nárazový vítr',
+    }
+
+    wind_df = df[df['region'].isin(['HKK', 'JHC', 'JHM', 'KVK']) & (df['p18'] != 0)]
+    wind_df = wind_df.loc[:, ['date', 'p18', 'hodnota', 'region']]
+    wind_df['p18'].replace(_rename, inplace=True)
+    wind_df['date2'] = wind_df.apply(lambda row: str(row['date'].month) + '/' + str(row['date'].year), axis=1)
+    wind_df = pd.pivot_table(wind_df, columns='p18', index=['region', 'date2'], values='hodnota', aggfunc='sum')
+    wind_df = wind_df.stack(level='p18').reset_index(name='Počet nehod')
+
+    # graphing
+    sns.set_theme()
+    sns.set_context("paper")
+    fig = sns.FacetGrid(wind_df, col='region', sharex=False, sharey=True, col_wrap=2, height=4, aspect=1.5)
+    fig.map_dataframe(sns.lineplot, x='date2', y='Počet nehod', hue='p18', palette="deep")
+    fig.set_titles('Kraj: {col_name}')
+    fig.add_legend()
+    fig.tight_layout()
+
+    if fig_location:
+        plt.savefig(fig_location)
+
+    if show_figure:
+        plt.show()
+        plt.close()
 
 
 if __name__ == "__main__":
-    # zde je ukazka pouziti, tuto cast muzete modifikovat podle libosti
-    # skript nebude pri testovani pousten primo, ale budou volany konkreni ¨
-    # funkce.
     _download_accidents()
-    df = get_dataframe("accidents.pkl.gz",
-                       verbose=True)  # tento soubor si stahnete sami, při testování pro hodnocení bude existovat
-    plot_roadtype(df, fig_location="01_roadtype.png", show_figure=True)
-    plot_animals(df, "02_animals.png", True)
-    plot_conditions(df, "03_conditions.png", True)
+    df = get_dataframe("accidents.pkl.gz", verbose=True)
+    plot_roadtype(df, fig_location="01_roadtype.png", )
+    plot_animals(df, "02_animals.png", )
+    plot_conditions(df, "03_conditions.png", )
