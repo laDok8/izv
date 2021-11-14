@@ -24,7 +24,7 @@ class DataDownloader:
     downloader/parser for zip files with accidents.csv files with predetermined structure
 
     Attributes:
-        headers    Nazvy hlavicek jednotlivych CSV souboru, tyto nazvy nemente!  
+        headers     Nazvy hlavicek jednotlivych CSV souboru, tyto nazvy nemente!
         regions     Dictionary s nazvy kraju : nazev csv souboru
     """
 
@@ -36,11 +36,11 @@ class DataDownloader:
                "p5a"]
 
     dataTypes = [str, int, str, str, int, int, int, int, int, int, int, int, int, int,
-                int, int, int, int, int, int, int, int, int, int, int, int, int, int,
-                int,
-                int, int, int, int, int, str, int, int, int, int, int, int, int, int,
-                int, int, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, int, int, str,
-                int]
+                 int, int, int, int, int, int, int, int, int, int, int, int, int, int,
+                 int,
+                 int, int, int, int, int, str, int, int, int, int, int, int, int, int,
+                 int, int, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, int, int, str,
+                 int]
 
     regions = {
         "PHA": "00",
