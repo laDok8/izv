@@ -1,20 +1,28 @@
 #!/usr/bin/env python3.9
 # coding=utf-8
 from matplotlib import pyplot as plt
+from matplotlib import dates as mDates
 import pandas as pd
 import seaborn as sns
-import numpy as np
 import os
 import requests as r
 
 
 def _download_accidents(url: str = "http://ehw.fit.vutbr.cz/izv/accidents.pkl.gz", fname: str = "accidents.pkl.gz"):
+    """
+    Download compressed data if missing
+    """
     if not os.path.isfile(fname):
         with r.get(url) as zips, open(fname, 'wb') as fp:
             fp.write(zips.content)
 
 
-def get_dataframe(filename: str, verbose: bool = False) -> pd.DataFrame:
+def get_dataframe(filename: str = "accidents.pkl.gz", verbose: bool = False) -> pd.DataFrame:
+    """
+    Get data from compressed fie
+    :param filename: name of file
+    :param verbose: show file sizes before/after optimization
+    """
     df = pd.read_pickle(filename)
     if verbose:
         mem = df.memory_usage(deep=True).sum() / (1024 ** 2)
@@ -29,7 +37,7 @@ def get_dataframe(filename: str, verbose: bool = False) -> pd.DataFrame:
                    "t",
                    "p5a"]
     df['p2a'] = df['p2a'].astype('datetime64')
-    df.rename({'p2a': 'date'}, inplace=True)
+    df.rename(columns={'p2a': 'date'}, inplace=True)
     df[convertable] = df[convertable].astype('category')
 
     if verbose:
@@ -38,9 +46,14 @@ def get_dataframe(filename: str, verbose: bool = False) -> pd.DataFrame:
     return df
 
 
-# Ukol 2: počty nehod v jednotlivých regionech podle druhu silnic
 def plot_roadtype(df: pd.DataFrame, fig_location: str = None,
                   show_figure: bool = False):
+    """
+    Create plot of accidents in relation to road type
+    :param df: dataframe
+    :param fig_location: location to store plot
+    :param show_figure: True to show visuals
+    """
     _rename = {
         0: 'Ostatní komunikace',
         1: 'Dvoupruhová',
@@ -54,16 +67,18 @@ def plot_roadtype(df: pd.DataFrame, fig_location: str = None,
     # make hard copy because of changing labels
     road_df = df.loc[:, ['region', 'p21', 'hodnota']]
     road_df['p21'].replace(_rename, inplace=True)
-    road_df = pd.pivot_table(road_df, columns="region", index='p21', values='hodnota', aggfunc='sum')
+    road_df.rename(columns={'region': 'Kraj'}, inplace=True)
+    road_df = pd.pivot_table(road_df, columns="Kraj", index='p21', values='hodnota', aggfunc='sum')
     road_df = road_df[['HKK', 'JHC', 'JHM', 'KVK']]
     road_df = road_df.stack().reset_index(name='Počet nehod')
 
     # graphing
     sns.set_theme()
     sns.set_context("paper")
-    fig = sns.FacetGrid(road_df, col='p21', sharex=False, sharey=True, col_wrap=3)
-    fig.map(sns.barplot, 'region', 'Počet nehod', palette="deep", order=None).set(yscale='log', ylim=(10, None))
+    fig = sns.FacetGrid(road_df, col='p21', sharex=False, sharey=False, col_wrap=3)
+    fig.map(sns.barplot, 'Kraj', 'Počet nehod', palette="deep", order=None)
     fig.set_titles('{col_name}')
+    fig.fig.suptitle('Nehodovost podle druhu silnic')
     fig.tight_layout()
 
     if fig_location:
@@ -74,9 +89,14 @@ def plot_roadtype(df: pd.DataFrame, fig_location: str = None,
         plt.close()
 
 
-# Ukol3: zavinění zvěří
 def plot_animals(df: pd.DataFrame, fig_location: str = None,
                  show_figure: bool = False):
+    """
+    Create plot of accidents caused by animals
+    :param df: dataframe
+    :param fig_location: location to store plot
+    :param show_figure: True to show visuals
+    """
     df['hodnota'] = 1
     _rename = {
         1: 'Řidičem',
@@ -91,16 +111,17 @@ def plot_animals(df: pd.DataFrame, fig_location: str = None,
     # remove 2021
     animals_df = animals_df[animals_df['date'].dt.year != 2021]
     animals_df['month'] = animals_df['date'].dt.month
-    # agregate month&region&cause
+    # aggregate month&region&cause
     animals_df = animals_df.groupby(['region', 'month', 'p10']).agg('sum').reset_index()
     animals_df.rename(columns={'hodnota': 'Počet nehod', 'month': 'Měsíc'}, inplace=True)
 
     # graphing
     sns.set_theme()
     sns.set_context("paper")
-    fig = sns.FacetGrid(animals_df, col='region', sharex=False, sharey=True, col_wrap=2, height=4, aspect=1.5)
+    fig = sns.FacetGrid(animals_df, col='region', sharex=False, sharey=False, col_wrap=2, height=4, aspect=1.5)
     fig.map_dataframe(sns.barplot, x='Měsíc', y='Počet nehod', hue='p10', palette="deep", order=None)
     fig.set_titles('Kraj: {col_name}')
+    fig.fig.suptitle('Nehodovost zaviněná zvěří')
     fig.add_legend()
     fig.tight_layout()
 
@@ -112,9 +133,14 @@ def plot_animals(df: pd.DataFrame, fig_location: str = None,
         plt.close()
 
 
-# Ukol 4: Povětrnostní podmínky
 def plot_conditions(df: pd.DataFrame, fig_location: str = None,
                     show_figure: bool = False):
+    """
+    Create plot of accidents caused by weather
+    :param df: dataframe
+    :param fig_location: location to store plot
+    :param show_figure: True to show visuals
+    """
     df['hodnota'] = 1
     _rename = {
         1: 'neztížené',
@@ -129,16 +155,26 @@ def plot_conditions(df: pd.DataFrame, fig_location: str = None,
     wind_df = df[df['region'].isin(['HKK', 'JHC', 'JHM', 'KVK']) & (df['p18'] != 0)]
     wind_df = wind_df.loc[:, ['date', 'p18', 'hodnota', 'region']]
     wind_df['p18'].replace(_rename, inplace=True)
-    wind_df['date2'] = wind_df.apply(lambda row: str(row['date'].month) + '/' + str(row['date'].year), axis=1)
-    wind_df = pd.pivot_table(wind_df, columns='p18', index=['region', 'date2'], values='hodnota', aggfunc='sum')
+    # wind_df['datum']=wind_df.apply(lambda row: str(row['date'].month)+'/'+str(row['date'].year),axis=1)
+    wind_df = pd.pivot_table(wind_df, columns='p18', index=['region', 'date'], values='hodnota', aggfunc='sum')
+
     wind_df = wind_df.stack(level='p18').reset_index(name='Počet nehod')
+    wind_df = wind_df.groupby(['region', 'p18', pd.Grouper(freq='M', key='date')]).sum()
+    wind_df = wind_df.reset_index()
+
+    # remove >2021
+    wind_df = wind_df[(wind_df['date'] < '2021') & (wind_df['date'] > '2015')]
+    wind_df.rename(columns={'date': 'Datum'}, inplace=True)
 
     # graphing
     sns.set_theme()
     sns.set_context("paper")
-    fig = sns.FacetGrid(wind_df, col='region', sharex=False, sharey=True, col_wrap=2, height=4, aspect=1.5)
-    fig.map_dataframe(sns.lineplot, x='date2', y='Počet nehod', hue='p18', palette="deep")
+    fig = sns.FacetGrid(wind_df, col='region', sharex=False, sharey=False, col_wrap=2, height=4, aspect=1.5)
+    g = fig.map_dataframe(sns.lineplot, x='Datum', y='Počet nehod', hue='p18', palette="deep")
+    for ax in g.axes.flatten():
+        ax.xaxis.set_major_formatter(mDates.DateFormatter('%m/%y'))
     fig.set_titles('Kraj: {col_name}')
+    fig.fig.suptitle('Nehodovost vlivem povětrnostních podmínek')
     fig.add_legend()
     fig.tight_layout()
 
