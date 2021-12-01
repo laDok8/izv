@@ -35,12 +35,13 @@ class DataDownloader:
                "p57", "p58", "a", "b", "d", "e", "f", "g", "h", "i", "j", "k", "l", "n", "o", "p", "q", "r", "s", "t",
                "p5a"]
 
-    dataTypes = [str, int, str, str, int, int, int, int, int, int, int, int, int, int,
-                 int, int, int, int, int, int, int, int, int, int, int, int, int, int,
-                 int,
-                 int, int, int, int, int, str, int, int, int, int, int, int, int, int,
-                 int, int, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, int, int, str,
-                 int]
+    dataTypes = [np.str_, np.int8, np.int8, np.datetime64, np.int8, np.str_, np.int8, np.int8, np.int8, np.int8,
+                 np.int8, np.int8, np.int16, np.int8, np.int8, np.int8, np.int16, np.int8, np.int8, np.int32,
+                 np.int8, np.int8, np.int8, np.int8, np.int8, np.int8, np.int8, np.int8, np.int8, np.int8,
+                 np.int8, np.int8, np.int8, np.int8, np.str_, np.int8, np.int8, np.int8, np.int8, np.int8,
+                 np.int8, np.int16, np.int8, np.int8, np.int8, np.float64, np.float64, np.float64, np.float64,
+                 np.float64, np.float64, np.str_, np.str_, np.str_, np.str_, np.str_, np.int32, np.str_, np.str_,
+                 np.str_, np.int32, np.int32, np.str_, np.int8, np.str_]
 
     regions = {
         "PHA": "00",
@@ -108,22 +109,20 @@ class DataDownloader:
                     reader = csv.reader(io.TextIOWrapper(f, 'cp1250'), delimiter=';', quotechar='"')
                     for row in reader:
                         for (i, hdr) in enumerate(self.headers):
-                            # type conversion
-                            try:
-                                if self.dataTypes[i] == int:
-                                    _data = int(row[i]) if row[i] else 0
-                                elif self.dataTypes[i] == float:
-                                    tmp = str.replace(row[i], ',', '.')
-                                    _data = float(tmp) if tmp else 0.
-                                else:
-                                    _data = row[i]
-                            except (Exception,):
-                                _data = row[i]
-
-                            _dict[hdr] += [_data]
+                            _dict[hdr] += [row[i]]
 
         # convert to np array
         _dict = ({key: np.array(y) for (key, y) in _dict.items()})
+
+        # convert types & replace commas with dot if neccesary
+        for hd, typ in zip(self.headers, self.dataTypes):
+            _dict[hd][_dict[hd] == ''] = -1
+            try:
+                if typ == np.float64:
+                    _dict[hd] = np.char.replace(_dict[hd], ',', '.')
+                _dict[hd] = _dict[hd].astype(typ)
+            except (Exception,):
+                pass
 
         # remove duplicities
         indices = np.unique(_dict[self.headers[0]], return_index=True)[1]
@@ -145,8 +144,9 @@ class DataDownloader:
         """
         regions = regions if regions else self.regions.keys()
         acc = {}
-        for hdr in self.headers + ["region"]:
-            acc[hdr] = np.array([])
+        for hdr, typ in zip(self.headers, self.dataTypes):
+            acc[hdr] = np.array([], dtype=typ)
+        acc['region'] = np.array([], dtype=np.str_)
 
         for reg in regions:
             fName = self.cache_filename
