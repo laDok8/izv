@@ -76,7 +76,7 @@ def plot_roadtype(df: pd.DataFrame, fig_location: str = None,
     sns.set_theme()
     sns.set_context("paper")
     fig = sns.FacetGrid(road_df, col='p21', sharex=False, sharey=False, col_wrap=3)
-    fig.map(sns.barplot, 'Kraj', 'Počet nehod', palette="deep", order=None)
+    fig.map(sns.barplot, 'Kraj', 'Počet nehod', palette="deep")
     fig.set_titles('{col_name}')
     fig.fig.suptitle('Nehodovost podle druhu silnic')
     fig.tight_layout()
@@ -155,7 +155,6 @@ def plot_conditions(df: pd.DataFrame, fig_location: str = None,
     wind_df = df[df['region'].isin(['HKK', 'JHC', 'JHM', 'KVK']) & (df['p18'] != 0)]
     wind_df = wind_df.loc[:, ['date', 'p18', 'hodnota', 'region']]
     wind_df['p18'].replace(_rename, inplace=True)
-    # wind_df['datum']=wind_df.apply(lambda row: str(row['date'].month)+'/'+str(row['date'].year),axis=1)
     wind_df = pd.pivot_table(wind_df, columns='p18', index=['region', 'date'], values='hodnota', aggfunc='sum')
 
     wind_df = wind_df.stack(level='p18').reset_index(name='Počet nehod')
